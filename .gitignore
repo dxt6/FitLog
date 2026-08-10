@@ -1,0 +1,49 @@
+# ===== Built application / packaging artifacts =====
+*.apk
+*.aar
+*.ap_
+*.aab
+*.apk list
+
+# ===== Compiled class & dex files =====
+*.class
+*.dex
+*.kotlin_module
+!**/src/**/*.class
+
+# ===== Build / generated output =====
+.gradle/
+build/
+app/build/
+.kotlin/
+captures/
+output.json
+.externalNativeBuild/
+.cxx/
+
+# ===== Gradle cache / config-cache artifacts =====
+*.flat
+*.len
+*.keystream
+*.bin
+*.tab
+*.tab_i
+*.lock
+*.uptodate
+*.probe
+*.at
+
+# ===== Local machine-specific config (SDK path, etc.) =====
+local.properties
+
+# ===== IDE / OS =====
+*.iml
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== Keystores / signing =====
+*.jks
+*.keystore
+*.p12
+*.pfx
