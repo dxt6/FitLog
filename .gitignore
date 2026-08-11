@@ -47,3 +47,6 @@ Thumbs.db
 *.keystore
 *.p12
 *.pfx
+
+# ===== WorkBuddy workspace data (not project source) =====
+.workbuddy/
