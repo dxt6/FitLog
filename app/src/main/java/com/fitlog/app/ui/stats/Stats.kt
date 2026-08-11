@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -24,9 +23,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,6 +45,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -55,9 +56,27 @@ class StatsViewModel : ViewModel() {
     val exercises: StateFlow<List<Exercise>> = repo.observeExercises()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun observeSets(exerciseId: String): StateFlow<List<SetWithDate>> =
-        repo.observeSetsWithDate(exerciseId)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _selectedId = MutableStateFlow<String?>(null)
+    val selectedId: StateFlow<String?> = _selectedId.asStateFlow()
+
+    // 选中动作后，用稳定的 flow 推导训练组，避免每次重组新建 StateFlow 造成闪烁
+    val sets: StateFlow<List<SetWithDate>> = _selectedId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList()) else repo.observeSetsWithDate(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        viewModelScope.launch(Dispatchers.Main.immediate) {
+            exercises.collect { list ->
+                if (_selectedId.value == null && list.isNotEmpty()) {
+                    _selectedId.value = list.first().id
+                }
+            }
+        }
+    }
+
+    fun select(id: String) {
+        _selectedId.value = id
+    }
 }
 
 data class StatsResult(
@@ -106,19 +125,13 @@ fun computeStats(sets: List<SetWithDate>): StatsResult {
 fun StatsScreen() {
     val vm: StatsViewModel = viewModel()
     val exercises by vm.exercises.collectAsState()
+    val selectedId by vm.selectedId.collectAsState()
+    val sets by vm.sets.collectAsState()
 
-    var selectedId by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-
-    LaunchedEffect(exercises) {
-        if (selectedId == null && exercises.isNotEmpty()) {
-            selectedId = exercises.first().id
-        }
-    }
-
-    val sets by if (selectedId != null) vm.observeSets(selectedId!!).collectAsState() else remember { mutableStateOf<List<SetWithDate>>(emptyList()) }
     val stats = remember(sets) { computeStats(sets) }
     val selectedExercise = exercises.firstOrNull { it.id == selectedId }
+
+    var expanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("统计") }) }
@@ -134,7 +147,7 @@ fun StatsScreen() {
                     exercises.forEach { ex ->
                         DropdownMenuItem(
                             text = { Text(ex.name) },
-                            onClick = { selectedId = ex.id; expanded = false }
+                            onClick = { vm.select(ex.id); expanded = false }
                         )
                     }
                 }

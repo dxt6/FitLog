@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 private const val KEY_THRESHOLD = "default_threshold_hours"
@@ -192,6 +193,10 @@ class FitnessRepository(
     // ---------------- 统计 ----------------
     fun observeSetsWithDate(exerciseId: String): Flow<List<com.fitlog.app.data.model.SetWithDate>> =
         sessionDao.observeSetsWithDate(exerciseId)
+
+    /** 所有有训练记录的日期集合（用于月历标记"练过"）。 */
+    fun observeTrainedDates(): Flow<Set<String>> =
+        sessionDao.observeAllSessionDates().map { it.toSet() }
 
     // ---------------- 备份 ----------------
     suspend fun exportData(): BackupData {

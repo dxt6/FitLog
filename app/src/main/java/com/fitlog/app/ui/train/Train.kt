@@ -1,6 +1,8 @@
 package com.fitlog.app.ui.train
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -21,6 +24,8 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -37,13 +42,16 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import com.fitlog.app.data.Graph
@@ -86,6 +94,13 @@ class TrainViewModel : ViewModel() {
     fun goToday() {
         _date.value = DateUtils.todayStr()
     }
+
+    fun goToDate(date: String) {
+        _date.value = date
+    }
+
+    val trainedDates: StateFlow<Set<String>> = repo.observeTrainedDates()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
     fun addExercise(exerciseId: String) = io { repo.addExerciseToDay(_date.value, exerciseId) }
     fun addSet(sessionExerciseId: String, defaultSide: Side) = io { repo.addSet(sessionExerciseId, defaultSide) }
@@ -138,26 +153,32 @@ fun TrainScreen() {
         }
     ) { padding ->
         val items = day?.items ?: emptyList()
-        if (items.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("这一天还没有训练记录\n点击右下角 + 添加动作", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(items, key = { it.sessionExercise.id }) { item ->
-                    DayExerciseCard(
-                        item = item,
-                        onAddSet = { vm.addSet(item.sessionExercise.id, item.exercise.defaultSide) },
-                        onEditSet = { editingSet = it },
-                        onDeleteSet = { vm.deleteSet(it) },
-                        onDeleteExercise = { vm.deleteExercise(item.sessionExercise) }
-                    )
+        Column(
+            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            TrainCalendar(vm)
+            Spacer(Modifier.height(8.dp))
+            if (items.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize().weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("这一天还没有训练记录\n点击右下角 + 添加动作", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize().weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(items, key = { it.sessionExercise.id }) { item ->
+                        DayExerciseCard(
+                            item = item,
+                            onAddSet = { vm.addSet(item.sessionExercise.id, item.exercise.defaultSide) },
+                            onEditSet = { editingSet = it },
+                            onDeleteSet = { vm.deleteSet(it) },
+                            onDeleteExercise = { vm.deleteExercise(item.sessionExercise) }
+                        )
+                    }
                 }
             }
         }
@@ -187,6 +208,132 @@ fun TrainScreen() {
                 editingSet = null
             }
         )
+    }
+}
+
+@Composable
+private fun TrainCalendar(vm: TrainViewModel) {
+    val date by vm.date.collectAsState()
+    val trained by vm.trainedDates.collectAsState()
+    var expanded by remember { mutableStateOf(false) }
+    var displayMonth by remember { mutableStateOf(date) }
+
+    // 外部切换日期（翻页/今天）时，同步月历显示月份
+    LaunchedEffect(date) { displayMonth = date }
+
+    val firstStr = DateUtils.toStr(DateUtils.firstOfMonth(displayMonth))
+    val lead = DateUtils.weekdayMondayFirst(firstStr) - 1 // 周一为第一列
+    val days = DateUtils.lengthOfMonth(displayMonth)
+    val total = lead + days
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { displayMonth = DateUtils.plusMonths(displayMonth, -1) }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = "上个月")
+                }
+                Text(
+                    DateUtils.yearMonthLabel(displayMonth),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                IconButton(onClick = { displayMonth = DateUtils.plusMonths(displayMonth, 1) }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "下个月")
+                }
+                IconButton(onClick = { expanded = !expanded }) {
+                    Icon(
+                        if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = "展开/收起日历"
+                    )
+                }
+            }
+
+            if (expanded) {
+                Spacer(Modifier.height(8.dp))
+                Row {
+                    listOf("一", "二", "三", "四", "五", "六", "日").forEach { w ->
+                        Text(
+                            w,
+                            modifier = Modifier.weight(1f),
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                    }
+                }
+                Spacer(Modifier.height(4.dp))
+
+                val cells: List<String?> = (0 until total).map { i ->
+                    if (i < lead) null else DateUtils.plusDays(firstStr, (i - lead).toLong())
+                }
+                cells.chunked(7).forEach { week ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        repeat(7) { col ->
+                            val d = week.getOrNull(col)
+                            Box(
+                                modifier = Modifier.weight(1f).padding(2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (d != null) {
+                                    val isTrained = trained.contains(d)
+                                    val isSelected = d == date
+                                    val bg = when {
+                                        isSelected -> MaterialTheme.colorScheme.primary
+                                        isTrained -> MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f)
+                                        else -> Color.Transparent
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(bg)
+                                            .clickable {
+                                                vm.goToDate(d)
+                                                expanded = false
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            DateUtils.dayOfMonth(d).toString(),
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary
+                                            else MaterialTheme.colorScheme.onSurface,
+                                            style = MaterialTheme.typography.labelMedium
+                                        )
+                                        if (isTrained && !isSelected) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(bottom = 4.dp),
+                                                contentAlignment = Alignment.BottomCenter
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(4.dp)
+                                                        .clip(CircleShape)
+                                                        .background(MaterialTheme.colorScheme.secondary)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(10.dp).clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary)
+                    )
+                    Text("练过", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
     }
 }
 

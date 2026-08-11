@@ -117,6 +117,9 @@ interface SessionDao {
     @Query("SELECT * FROM sets ORDER BY setIndex ASC")
     fun observeAllSets(): Flow<List<SetRecord>>
 
+    @Query("SELECT DISTINCT date FROM sessions")
+    fun observeAllSessionDates(): Flow<List<String>>
+
     @Query("SELECT * FROM sets")
     suspend fun getAllSets(): List<SetRecord>
 
