@@ -117,6 +117,14 @@ interface SessionDao {
     @Query("SELECT * FROM sets ORDER BY setIndex ASC")
     fun observeAllSets(): Flow<List<SetRecord>>
 
+    /** 只查某个训练会话下的所有组（按当天 session 限定，避免全表扫描）。 */
+    @Query(
+        "SELECT sets.* FROM sets " +
+        "JOIN session_exercises se ON sets.sessionExerciseId = se.id " +
+        "WHERE se.sessionId = :sessionId ORDER BY sets.setIndex ASC"
+    )
+    fun observeSetsBySession(sessionId: String): Flow<List<SetRecord>>
+
     @Query("SELECT DISTINCT date FROM sessions")
     fun observeAllSessionDates(): Flow<List<String>>
 

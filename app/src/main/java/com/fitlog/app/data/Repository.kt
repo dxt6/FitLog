@@ -87,10 +87,10 @@ class FitnessRepository(
             combine(
                 sessionDao.observeSessionExercises(session.id),
                 exerciseDao.observeAll(),
-                sessionDao.observeAllSets()
-            ) { ses, exs, allSets ->
+                sessionDao.observeSetsBySession(session.id)
+            ) { ses, exs, daySets ->
                 val exMap = exs.associateBy { it.id }
-                val setsBySe = allSets.groupBy { it.sessionExerciseId }
+                val setsBySe = daySets.groupBy { it.sessionExerciseId }
                 val items = ses.mapNotNull { se ->
                     val ex = exMap[se.exerciseId] ?: return@mapNotNull null
                     DayExerciseUi(se, ex, setsBySe[se.id].orEmpty())
