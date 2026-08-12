@@ -3,23 +3,18 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- 蓝色背景（与品牌色一致） -->
     <path
         android:fillColor="#1976D2"
         android:pathData="M0,0h108v108h-108z" />
-    <!-- 杠铃：长杆 + 两端大配重盘 + 内侧卡箍 -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M20,50 H88 V58 H20 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M10,54 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M70,54 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0 Z" />
-    <path
-        android:fillColor="#1976D2"
-        android:pathData="M35,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z" />
-    <path
-        android:fillColor="#1976D2"
-        android:pathData="M63,54 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 Z" />
+    <!-- 训练人形（Material Icons FitnessCenter，官方路径，缩放到 108 画布安全区） -->
+    <group
+        android:translateX="18"
+        android:translateY="18"
+        android:scaleX="3"
+        android:scaleY="3">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M20.57 14.86L22 13.43 20.57 12 17 15.57 8.43 7 12 3.43 10.57 2 9.14 3.43 7.71 2 5.57 4.14 4.14 2.71 2.71 4.14l1.43 1.43L2 7.71l1.43 1.43L2 10.57 3.43 12 7 8.43 15.57 17 12 20.57 13.43 22l1.43-1.43L16.29 22l2.14-2.14 1.43 1.43 1.43-1.43-1.43-1.43L22 16.29z" />
+    </group>
 </vector>
