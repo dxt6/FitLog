@@ -129,6 +129,8 @@ fun TrainScreen() {
 
     var showAdd by remember { mutableStateOf(false) }
     var editingSet by remember { mutableStateOf<SetRecord?>(null) }
+    var pendingDeleteSet by remember { mutableStateOf<SetRecord?>(null) }
+    var pendingDeleteExercise by remember { mutableStateOf<DayExerciseUi?>(null) }
 
     Scaffold(
         topBar = {
@@ -175,8 +177,8 @@ fun TrainScreen() {
                             item = item,
                             onAddSet = { vm.addSet(item.sessionExercise.id, item.exercise.defaultSide) },
                             onEditSet = { editingSet = it },
-                            onDeleteSet = { vm.deleteSet(it) },
-                            onDeleteExercise = { vm.deleteExercise(item.sessionExercise) }
+                            onDeleteSet = { pendingDeleteSet = it },
+                            onDeleteExercise = { pendingDeleteExercise = item }
                         )
                     }
                 }
@@ -204,11 +206,54 @@ fun TrainScreen() {
                 editingSet = null
             },
             onDelete = {
-                vm.deleteSet(set)
                 editingSet = null
+                pendingDeleteSet = set
             }
         )
     }
+
+    pendingDeleteSet?.let { set ->
+        DeleteConfirmDialog(
+            message = "确定删除「第 ${set.setIndex} 组 · ${formatWeight(set.weight)}kg × ${set.reps}次」吗？\n删除后无法恢复。",
+            onDismiss = { pendingDeleteSet = null },
+            onConfirm = {
+                vm.deleteSet(set)
+                pendingDeleteSet = null
+            }
+        )
+    }
+
+    pendingDeleteExercise?.let { item ->
+        DeleteConfirmDialog(
+            message = "确定删除动作「${item.exercise.name}」及其全部 ${item.sets.size} 组记录吗？\n删除后无法恢复。",
+            onDismiss = { pendingDeleteExercise = null },
+            onConfirm = {
+                vm.deleteExercise(item.sessionExercise)
+                pendingDeleteExercise = null
+            }
+        )
+    }
+}
+
+@Composable
+private fun DeleteConfirmDialog(
+    message: String,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("确认删除") },
+        text = { Text(message) },
+        confirmButton = {
+            Button(onClick = onConfirm) {
+                Text("删除", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
 }
 
 @Composable
