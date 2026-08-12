@@ -49,6 +49,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fitlog.app.ui.ConfirmDeleteDialog
 import androidx.lifecycle.viewModelScope
 import com.fitlog.app.data.BuiltInExercises
 import com.fitlog.app.data.Graph
@@ -146,14 +147,11 @@ fun ExerciseLibraryScreen() {
     }
 
     toDelete?.let { ex ->
-        AlertDialog(
-            onDismissRequest = { toDelete = null },
-            confirmButton = {
-                Button(onClick = { vm.delete(ex); toDelete = null }) { Text("删除") }
-            },
-            dismissButton = { TextButton(onClick = { toDelete = null }) { Text("取消") } },
-            title = { Text("删除动作") },
-            text = { Text("确定删除『${ex.name}』？该动作的历史训练记录会保留。") }
+        ConfirmDeleteDialog(
+            title = "删除动作",
+            message = "确定删除「${ex.name}」？\n该动作在训练记录中的历史数据会保留，但动作本身将从动作库移除。",
+            onDismiss = { toDelete = null },
+            onConfirm = { vm.delete(ex); toDelete = null }
         )
     }
 

@@ -60,6 +60,7 @@ import com.fitlog.app.data.model.DayExerciseUi
 import com.fitlog.app.data.model.Exercise
 import com.fitlog.app.data.model.SetRecord
 import com.fitlog.app.data.model.Side
+import com.fitlog.app.ui.ConfirmDeleteDialog
 import com.fitlog.app.ui.theme.FitLogTheme
 import com.fitlog.app.util.DateUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -213,7 +214,7 @@ fun TrainScreen() {
     }
 
     pendingDeleteSet?.let { set ->
-        DeleteConfirmDialog(
+        ConfirmDeleteDialog(
             message = "确定删除「第 ${set.setIndex} 组 · ${formatWeight(set.weight)}kg × ${set.reps}次」吗？\n删除后无法恢复。",
             onDismiss = { pendingDeleteSet = null },
             onConfirm = {
@@ -224,7 +225,7 @@ fun TrainScreen() {
     }
 
     pendingDeleteExercise?.let { item ->
-        DeleteConfirmDialog(
+        ConfirmDeleteDialog(
             message = "确定删除动作「${item.exercise.name}」及其全部 ${item.sets.size} 组记录吗？\n删除后无法恢复。",
             onDismiss = { pendingDeleteExercise = null },
             onConfirm = {
@@ -233,27 +234,6 @@ fun TrainScreen() {
             }
         )
     }
-}
-
-@Composable
-private fun DeleteConfirmDialog(
-    message: String,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("确认删除") },
-        text = { Text(message) },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("删除", color = MaterialTheme.colorScheme.error)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        }
-    )
 }
 
 @Composable
