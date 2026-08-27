@@ -16,9 +16,17 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScaffoldDefaults
@@ -38,9 +46,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.fitlog.app.backup.BackupManager
+import com.fitlog.app.data.AppConfig
 import com.fitlog.app.data.Graph
+import com.fitlog.app.data.model.VoiceDraft
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.widget.Toast
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.text.style.TextOverflow
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @Composable
 fun SettingsScreen() {
@@ -142,6 +157,35 @@ fun SettingsScreen() {
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("硅基流动 API Key", style = MaterialTheme.typography.titleMedium)
+                    var apiKey by remember { mutableStateOf(repo.getApiKey()) }
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("sk- 开头密钥（ASR 与 LLM 共用）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(onClick = {
+                            repo.setApiKey(apiKey)
+                            Toast.makeText(context, "已保存 API Key", Toast.LENGTH_SHORT).show()
+                        }, modifier = Modifier.weight(1f)) { Text("保存") }
+                        OutlinedButton(onClick = {
+                            apiKey = AppConfig.DEFAULT_API_KEY
+                            repo.setApiKey(apiKey)
+                            Toast.makeText(context, "已恢复默认 Key", Toast.LENGTH_SHORT).show()
+                        }, modifier = Modifier.weight(1f)) { Text("恢复默认") }
+                    }
+                    Text(
+                        "语音录入的「语音转写」与「结构化解析」都走硅基流动同一个 Key；可在 siliconflow.cn 后台「API 密钥」复制 sk- 开头密钥覆盖。",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("数据备份", style = MaterialTheme.typography.titleMedium)
                     Button(onClick = { exportLauncher.launch("fitlog_backup.json") }, modifier = Modifier.fillMaxWidth()) {
                         Text("导出为 JSON 文件")
@@ -157,6 +201,45 @@ fun SettingsScreen() {
                         }, modifier = Modifier.weight(1f)) { Text("导入（覆盖）") }
                     }
                     Text("合并：保留现有数据并加入备份中的记录；覆盖：先清空再写入。", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("语音草稿（解析失败留存）", style = MaterialTheme.typography.titleMedium)
+                    val drafts by repo.observeDrafts().collectAsState(initial = emptyList())
+                    if (drafts.isEmpty()) {
+                        Text("暂无草稿", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                            items(drafts, key = { it.id }) { d: VoiceDraft ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            d.rawText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(java.util.Date(d.createdAt)),
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                    IconButton(onClick = {
+                                        scope.launch(Dispatchers.IO) { repo.deleteDraft(d) }
+                                    }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "删除草稿", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                        Text("语音没解析出来时，听到的原话会留在这里，方便你手动补录。", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             }
         }

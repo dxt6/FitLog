@@ -10,6 +10,9 @@
 - **统计**：最大重量 / 最大次数 / 估算 1RM / 总容量 / 重量趋势 / 容量柱状图 / RPE 趋势（Canvas 自绘）。
 - **设置**：默认阈值、提醒总开关、单位（kg/lb）、通知权限、JSON 导出 / 导入（合并 / 覆盖）。
 - **存储**：本地 Room 数据库，纯离线，无需登录。
+- **语音录入**：训练页「按住说话」按钮，录音后经硅基流动 **ASR（SenseVoiceSmall）** 转写、再用 **LLM（Qwen/Qwen3-8B）** 解析成结构化训练数据，自动写入当天记录。ASR 与 LLM 共用同一个硅基流动 API Key（设置页可填/改）。
+
+  > 接口已验证：ASR `POST /v1/audio/transcriptions`、LLM `POST /v1/chat/completions`（response_format=json_object）。默认 Key 已内置开箱即用，也可在「设置 → 硅基流动 API Key」覆盖。解析失败时的原始语音会存入「设置 → 语音草稿」。
 
 ## 如何运行
 

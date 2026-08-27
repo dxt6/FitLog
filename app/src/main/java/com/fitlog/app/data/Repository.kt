@@ -8,6 +8,7 @@ import com.fitlog.app.data.model.ReminderRule
 import com.fitlog.app.data.model.SessionExercise
 import com.fitlog.app.data.model.SetRecord
 import com.fitlog.app.data.model.Side
+import com.fitlog.app.data.model.VoiceDraft
 import com.fitlog.app.data.model.WorkoutSession
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -34,6 +35,7 @@ class FitnessRepository(
     private val exerciseDao = db.exerciseDao()
     private val sessionDao = db.sessionDao()
     private val reminderDao = db.reminderDao()
+    private val draftDao = db.draftDao()
 
     // ---------------- 全局设置 ----------------
     fun getDefaultThreshold(): Int = prefs.getInt(KEY_THRESHOLD, 72)
@@ -223,5 +225,111 @@ class FitnessRepository(
         data.sessionExercises.forEach { sessionDao.insertSessionExercise(it) }
         data.sets.forEach { sessionDao.insertSet(it) }
         data.rules.forEach { reminderDao.upsert(it) }
+    }
+
+    // ---------------- 硅基流动 API Key ----------------
+    fun getApiKey(): String = prefs.getString(KEY_API_KEY, null) ?: AppConfig.DEFAULT_API_KEY
+    fun setApiKey(k: String) {
+        prefs.edit().putString(KEY_API_KEY, k.trim()).apply()
+    }
+
+    // ---------------- 语音录入 ----------------
+    /**
+     * 把 LLM 解析结果写入当天的训练记录。
+     * 每个动作：解析候选名 -> 库内动作（缺失则建自定义），再写入对应组数。
+     * @return 本次写入的（动作名, 组数）列表，供 UI 反馈。
+     */
+    suspend fun logVoiceWorkout(date: String, parsed: com.fitlog.app.voice.ParsedWorkout): List<Pair<String, Int>> {
+        val sessionId = getOrCreateSession(date)
+        val existingSes = sessionDao.getSessionExercises(sessionId)
+        val result = mutableListOf<Pair<String, Int>>()
+        for (pe in parsed.exercises) {
+            val ex = resolveVoiceExercise(pe.name)
+            val se = existingSes.firstOrNull { it.exerciseId == ex.id }
+                ?: run {
+                    val created = SessionExercise(
+                        id = UUID.randomUUID().toString(),
+                        sessionId = sessionId,
+                        exerciseId = ex.id,
+                        orderIndex = sessionDao.getSessionExercises(sessionId).size
+                    )
+                    sessionDao.insertSessionExercise(created)
+                    created
+                }
+            val startIdx = sessionDao.getSets(se.id).size + 1
+            repeat(pe.sets) { i ->
+                sessionDao.insertSet(
+                    SetRecord(
+                        id = UUID.randomUUID().toString(),
+                        sessionExerciseId = se.id,
+                        setIndex = startIdx + i,
+                        weight = pe.weightKg.toFloat(),
+                        reps = pe.reps,
+                        side = Side.BOTH,
+                        rpe = null,
+                        note = ""
+                    )
+                )
+            }
+            result.add(ex.name to pe.sets)
+        }
+        return result
+    }
+
+    /**
+     * 将口语里的动作名解析成库内动作：
+     * 1) 精确名匹配；2) 候选别名表；3) 包含匹配；4) 都不中则建自定义动作。
+     */
+    suspend fun resolveVoiceExercise(name: String): Exercise {
+        val n = name.trim()
+        if (n.isEmpty()) throw IllegalArgumentException("动作名为空")
+
+        exerciseDao.findByName(n)?.let { return it }
+
+        VOICE_ALIASES[n]?.let { id ->
+            if (id != null) exerciseDao.getById(id)?.let { return it }
+        }
+
+        val all = exerciseDao.getAll()
+        all.firstOrNull { it.name.contains(n) || n.contains(it.name) }?.let { return it }
+
+        return addCustomExercise(n, guessGroup(n), Side.BOTH)
+    }
+
+    private fun guessGroup(name: String): String = when {
+        name.contains("深蹲") || name.contains("硬拉") || name.contains("腿举") ||
+            name.contains("臀推") || name.contains("蹲") || name.contains("腿") -> "腿"
+        name.contains("卧推") || name.contains("胸") || name.contains("夹") -> "胸"
+        name.contains("引体") || name.contains("划船") || name.contains("下拉") || name.contains("背") -> "背"
+        name.contains("肩") || name.contains("推举") || name.contains("侧平") -> "肩"
+        name.contains("弯举") || name.contains("臂") || name.contains("三头") || name.contains("二头") -> "手臂"
+        name.contains("腹") || name.contains("核心") || name.contains("卷") || name.contains("举腿") -> "核心"
+        else -> "其他"
+    }
+
+    // ---------------- 语音草稿 ----------------
+    suspend fun saveDraft(raw: String) {
+        if (raw.isBlank()) return
+        draftDao.insert(VoiceDraft(UUID.randomUUID().toString(), raw, System.currentTimeMillis()))
+    }
+
+    fun observeDrafts(): Flow<List<VoiceDraft>> = draftDao.observeAll()
+
+    suspend fun deleteDraft(d: VoiceDraft) = draftDao.delete(d)
+
+    companion object {
+        private const val KEY_API_KEY = "siliconflow_api_key"
+
+        /** 候选动作名 -> 库内动作 id（null 表示库内没有，需建自定义动作）。 */
+        private val VOICE_ALIASES: Map<String, String?> = mapOf(
+            "深蹲" to "builtin_squat",
+            "硬拉" to "builtin_deadlift",
+            "卧推" to "builtin_bench_press",
+            "腿举" to "builtin_leg_press",
+            "臀推" to null,
+            "二头弯举" to "builtin_db_curl",
+            "肩推" to "builtin_ohp",
+            "引体向上" to "builtin_pull_up"
+        )
     }
 }

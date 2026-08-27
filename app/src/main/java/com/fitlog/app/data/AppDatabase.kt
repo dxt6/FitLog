@@ -14,6 +14,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.fitlog.app.data.model.Exercise
 import com.fitlog.app.data.model.ReminderRule
@@ -21,6 +22,7 @@ import com.fitlog.app.data.model.SessionExercise
 import com.fitlog.app.data.model.SetRecord
 import com.fitlog.app.data.model.SetWithDate
 import com.fitlog.app.data.model.Side
+import com.fitlog.app.data.model.VoiceDraft
 import com.fitlog.app.data.model.WorkoutSession
 import kotlinx.coroutines.flow.Flow
 
@@ -168,6 +170,23 @@ interface SessionDao {
 }
 
 @Dao
+interface DraftDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(d: VoiceDraft)
+
+    @Query("SELECT * FROM voice_drafts ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<VoiceDraft>>
+
+    @Query("SELECT * FROM voice_drafts")
+    suspend fun getAll(): List<VoiceDraft>
+
+    @Delete suspend fun delete(d: VoiceDraft)
+
+    @Query("DELETE FROM voice_drafts")
+    suspend fun clear()
+}
+
+@Dao
 interface ReminderDao {
     @Query("SELECT * FROM reminder_rules")
     suspend fun getAll(): List<ReminderRule>
@@ -186,8 +205,8 @@ interface ReminderDao {
 }
 
 @Database(
-    entities = [Exercise::class, WorkoutSession::class, SessionExercise::class, SetRecord::class, ReminderRule::class],
-    version = 1,
+    entities = [Exercise::class, WorkoutSession::class, SessionExercise::class, SetRecord::class, ReminderRule::class, VoiceDraft::class],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -195,9 +214,23 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun exerciseDao(): ExerciseDao
     abstract fun sessionDao(): SessionDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun draftDao(): DraftDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
+
+        /** v1 -> v2：仅新增 voice_drafts 表，保留全部历史训练数据。 */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `voice_drafts` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`rawText` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+            }
+        }
 
         fun get(context: android.content.Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -206,6 +239,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "fitlog.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

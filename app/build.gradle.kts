@@ -12,8 +12,8 @@ android {
         applicationId = "com.fitlog.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
     }
 
     buildTypes {
@@ -78,4 +78,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // 语音录入：OkHttp4 调用硅基流动 ASR / LLM
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

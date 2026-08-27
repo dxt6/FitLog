@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -47,11 +48,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -72,6 +75,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.core.content.ContextCompat
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import com.fitlog.app.voice.VoiceViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.viewModelScope
@@ -130,6 +142,27 @@ fun TrainScreen() {
     val day by vm.day.collectAsState()
     val exercises by vm.exercises.collectAsState()
 
+    val voiceVm: VoiceViewModel = viewModel()
+    val voiceState by voiceVm.state.collectAsState()
+    val recSeconds by voiceVm.seconds.collectAsState()
+    val snackbarHost = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var voiceError by remember { mutableStateOf<Pair<String, String?>?>(null) }
+
+    LaunchedEffect(voiceState) {
+        when (val s = voiceState) {
+            is VoiceViewModel.VoiceState.Success -> {
+                val msg = s.summary.joinToString("，") { "${it.first} ×${it.second}组" }
+                scope.launch { snackbarHost.showSnackbar("已记录：$msg") }
+                voiceVm.consume()
+            }
+            is VoiceViewModel.VoiceState.Error -> {
+                voiceError = s.message to s.rawText
+            }
+            else -> {}
+        }
+    }
+
     var showAdd by remember { mutableStateOf(false) }
     var editingSet by remember { mutableStateOf<SetRecord?>(null) }
     var pendingDeleteSet by remember { mutableStateOf<SetRecord?>(null) }
@@ -137,6 +170,7 @@ fun TrainScreen() {
 
     Scaffold(
         contentWindowInsets = ScaffoldDefaults.contentWindowInsets.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+        snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             TopAppBar(
                 title = { Text("训练记录") },
@@ -163,6 +197,14 @@ fun TrainScreen() {
             modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
             TrainCalendar(vm)
+            Spacer(Modifier.height(8.dp))
+            VoiceCaptureBar(
+                state = voiceState,
+                seconds = recSeconds,
+                onStart = { voiceVm.startRecording() },
+                onStop = { voiceVm.stopAndProcess() },
+                onCancel = { voiceVm.cancelRecording() }
+            )
             Spacer(Modifier.height(8.dp))
             if (items.isEmpty()) {
                 Box(
@@ -236,6 +278,104 @@ fun TrainScreen() {
                 pendingDeleteExercise = null
             }
         )
+    }
+
+    voiceError?.let { (message, raw) ->
+        AlertDialog(
+            onDismissRequest = { voiceError = null; voiceVm.consume() },
+            confirmButton = {
+                TextButton(onClick = { voiceError = null; voiceVm.consume() }) { Text("知道了") }
+            },
+            title = { Text("语音录入未成功") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(message)
+                    if (!raw.isNullOrBlank()) {
+                        Text(
+                            "听到的原始内容已存入草稿（设置页可查看）：\n$raw",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun VoiceCaptureBar(
+    state: VoiceViewModel.VoiceState,
+    seconds: Int,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val context = LocalContext.current
+    val recording = state is VoiceViewModel.VoiceState.Recording
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) onStart() else onCancel()
+    }
+
+    val statusText = when (state) {
+        is VoiceViewModel.VoiceState.Idle -> "按住说话，自动识别动作与重量"
+        is VoiceViewModel.VoiceState.Recording -> "录音中 ${seconds}s（松开发送，超 60s 自动停止）"
+        is VoiceViewModel.VoiceState.Transcribing -> "识别中…"
+        is VoiceViewModel.VoiceState.Parsing -> "解析中…"
+        is VoiceViewModel.VoiceState.Success -> "已记录"
+        is VoiceViewModel.VoiceState.Error -> "未成功"
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (recording) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.primary
+                    )
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onPress = {
+                                val granted = ContextCompat.checkSelfPermission(
+                                    context, Manifest.permission.RECORD_AUDIO
+                                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                if (!granted) {
+                                    permLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    return@detectTapGestures
+                                }
+                                onStart()
+                                val released = tryAwaitRelease()
+                                if (released) onStop() else onCancel()
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Mic,
+                    contentDescription = "语音录入",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("语音录入", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    statusText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (recording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

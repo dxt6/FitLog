@@ -80,3 +80,11 @@ data class DayDetail(
     val session: WorkoutSession,
     val items: List<DayExerciseUi>
 )
+
+/** 语音解析失败时的原始文本草稿（供用户后续手动补录）。 */
+@Entity(tableName = "voice_drafts")
+data class VoiceDraft(
+    @PrimaryKey val id: String,
+    val rawText: String,
+    val createdAt: Long
+)
