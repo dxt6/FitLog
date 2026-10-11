@@ -1,0 +1,8 @@
+<resources>
+    <style name="Theme.FitLogGlass" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#050914</item>
+        <item name="android:navigationBarColor">#050914</item>
+        <item name="android:colorBackground">#050914</item>
+        <item name="android:windowBackground">#050914</item>
+    </style>
+</resources>
