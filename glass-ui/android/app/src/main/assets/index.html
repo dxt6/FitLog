@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>FitLog · 玻璃版</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- 动态背景：彩色光斑 + 网格，让玻璃折射可见 -->
+  <div class="bg-layer">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="blob b4"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-word">FITLOG</div>
+  </div>
+
+  <!-- 苹果同源液态玻璃：边缘倒角位移贴图 -->
+  <svg id="glassSvg" width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="liquidGlass" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+        <feImage id="mapImg" x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map" />
+        <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur" />
+        <feDisplacementMap id="disp" in="blur" in2="map" scale="34" xChannelSelector="R" yChannelSelector="G" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="app">
+    <!-- 顶部玻璃栏 -->
+    <header class="topbar glass">
+      <div class="topbar-left">
+        <div class="logo">💪</div>
+        <div class="title-wrap">
+          <div class="title">FitLog</div>
+          <div class="subtitle">训练记录 · 玻璃版</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <button class="icon-btn" id="themeToggle" title="切换背景">🌗</button>
+        <button class="icon-btn" id="refractToggle" title="液态折射">🔮</button>
+      </div>
+    </header>
+
+    <!-- 主内容（按 Tab 切换） -->
+    <main class="stage" id="stage">
+
+      <!-- 训练 -->
+      <section class="tab-panel active" data-tab="train">
+        <div class="day-bar glass">
+          <button class="day-nav" id="dayPrev">‹</button>
+          <div class="day-info">
+            <div class="day-date" id="dayLabel">今天</div>
+            <div class="day-sub" id="dayWeek">2026-10-11 周日</div>
+          </div>
+          <button class="day-nav" id="dayNext">›</button>
+          <button class="day-today" id="dayToday">今天</button>
+        </div>
+
+        <div class="vol-strip glass">
+          <div class="vol-item"><div class="vol-num" id="volTotal">0</div><div class="vol-lbl">总容量 (kg)</div></div>
+          <div class="vol-item"><div class="vol-num" id="volSets">0</div><div class="vol-lbl">组数</div></div>
+          <div class="vol-item"><div class="vol-num" id="volEx">0</div><div class="vol-lbl">动作</div></div>
+        </div>
+
+        <div id="trainList" class="train-list"></div>
+
+        <button class="add-exercise glass" id="openPicker">＋ 添加动作</button>
+      </section>
+
+      <!-- 动作库 -->
+      <section class="tab-panel" data-tab="library">
+        <div class="search-wrap glass">
+          <span class="search-ic">🔍</span>
+          <input id="libSearch" class="search-input" placeholder="搜索动作…" />
+        </div>
+        <div class="chips" id="libChips"></div>
+        <div id="libList" class="lib-list"></div>
+      </section>
+
+      <!-- 统计 -->
+      <section class="tab-panel" data-tab="stats">
+        <div class="stats-head glass">
+          <select id="statExercise" class="glass-select"></select>
+          <select id="statRange" class="glass-select">
+            <option value="14">近 14 天</option>
+            <option value="30" selected>近 30 天</option>
+            <option value="90">近 90 天</option>
+            <option value="0">全部</option>
+          </select>
+        </div>
+        <div class="pr-grid" id="prGrid"></div>
+        <div class="chart-card glass">
+          <div class="chart-title">重量 / 次数 趋势</div>
+          <canvas id="chartTrend" width="640" height="240"></canvas>
+        </div>
+        <div class="chart-card glass">
+          <div class="chart-title">训练容量（按日）</div>
+          <canvas id="chartVol" width="640" height="220"></canvas>
+        </div>
+        <div class="chart-card glass">
+          <div class="chart-title">RPE 趋势</div>
+          <canvas id="chartRpe" width="640" height="200"></canvas>
+        </div>
+      </section>
+
+      <!-- 设置 -->
+      <section class="tab-panel" data-tab="settings">
+        <div class="settings-list" id="settingsList"></div>
+        <div class="settings-actions">
+          <button class="ghost-btn glass" id="exportBtn">⬇ 导出 JSON</button>
+          <button class="ghost-btn glass" id="importBtn">⬆ 导入 JSON</button>
+          <input type="file" id="importFile" accept="application/json" hidden />
+        </div>
+        <div class="settings-note glass">
+          数据保存在本机浏览器（localStorage），纯离线，无需登录。
+        </div>
+      </section>
+
+    </main>
+
+    <!-- 底部玻璃导航 -->
+    <nav class="navbar glass" id="navbar">
+      <button class="nav-item active" data-go="train"><span class="nav-ic">🏋️</span><span>训练</span></button>
+      <button class="nav-item" data-go="library"><span class="nav-ic">📚</span><span>动作库</span></button>
+      <button class="nav-item" data-go="stats"><span class="nav-ic">📊</span><span>统计</span></button>
+      <button class="nav-item" data-go="settings"><span class="nav-ic">⚙️</span><span>设置</span></button>
+    </nav>
+
+    <!-- 语音录入 FAB -->
+    <button class="fab glass-liquid" id="voiceFab" title="按住说话">🎙️</button>
+  </div>
+
+  <!-- 添加动作 弹层 -->
+  <div class="sheet-mask" id="pickerMask" hidden>
+    <div class="sheet glass" id="pickerSheet">
+      <div class="sheet-head">
+        <div class="sheet-title">选择动作</div>
+        <button class="icon-btn" id="pickerClose">✕</button>
+      </div>
+      <div class="search-wrap glass" style="margin:0 0 10px">
+        <span class="search-ic">🔍</span>
+        <input id="pickerSearch" class="search-input" placeholder="搜索动作…" />
+      </div>
+      <div class="chips" id="pickerChips"></div>
+      <div id="pickerList" class="picker-list"></div>
+    </div>
+  </div>
+
+  <!-- 组内编辑 弹层 -->
+  <div class="sheet-mask" id="setMask" hidden>
+    <div class="sheet glass" id="setSheet">
+      <div class="sheet-head">
+        <div class="sheet-title" id="setSheetTitle">编辑组</div>
+        <button class="icon-btn" id="setClose">✕</button>
+      </div>
+      <div class="set-form">
+        <label>重量 (kg)<input type="number" id="setWeight" min="0" step="0.5" /></label>
+        <label>次数<input type="number" id="setReps" min="0" step="1" /></label>
+        <label>单双边
+          <select id="setSide">
+            <option value="BOTH">双手</option>
+            <option value="LEFT">左手</option>
+            <option value="RIGHT">右手</option>
+          </select>
+        </label>
+        <label>RPE (1-10)<input type="number" id="setRpe" min="1" max="10" step="0.5" /></label>
+      </div>
+      <div class="set-actions">
+        <button class="ghost-btn danger" id="setDelete">删除这组</button>
+        <button class="ghost-btn primary" id="setSave">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
