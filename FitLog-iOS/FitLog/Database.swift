@@ -79,7 +79,7 @@ final class Database {
 
     /// 执行带参数的写入 SQL（INSERT / UPDATE / DELETE），返回是否成功。
     @discardableResult
-    func run(_ sql: String, bind: (OpaquePointer) -> Void = { _ in }) -> Bool {
+    func run(_ sql: String, bind: @escaping (OpaquePointer) -> Void = { _ in }) -> Bool {
         queue.sync {
             guard let stmt = prepare(sql) else { return false }
             defer { sqlite3_finalize(stmt) }
@@ -94,7 +94,7 @@ final class Database {
     }
 
     /// 查询并逐行映射。
-    func query<T>(_ sql: String, bind: (OpaquePointer) -> Void = { _ in }, row: (OpaquePointer) -> T) -> [T] {
+    func query<T>(_ sql: String, bind: @escaping (OpaquePointer) -> Void = { _ in }, row: (OpaquePointer) -> T) -> [T] {
         queue.sync {
             guard let stmt = prepare(sql) else { return [] }
             defer { sqlite3_finalize(stmt) }
@@ -108,7 +108,7 @@ final class Database {
     }
 
     /// 查询单个 Int（COUNT 等）。
-    func count(_ sql: String, bind: (OpaquePointer) -> Void = { _ in }) -> Int {
+    func count(_ sql: String, bind: @escaping (OpaquePointer) -> Void = { _ in }) -> Int {
         query(sql, bind: bind) { Int(sqlite3_column_int64($0, 0)) }.first ?? 0
     }
 

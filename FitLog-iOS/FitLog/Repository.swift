@@ -84,33 +84,33 @@ final class Repository {
                 muscleGroup: colText(stmt, 2),
                 defaultSide: Side(rawValue: colText(stmt, 3)) ?? .both,
                 isBuiltIn: colBool(stmt, 4),
-                createdAt: colDouble(stmt, 5)
+                createdAt: colInt(stmt, 5)
             )
         }
     }
 
     func getExercise(byId id: String) -> Exercise? {
-        db.query("SELECT * FROM exercises WHERE id = ?", { bindText($0, 1, id) }) { stmt in
+        db.query("SELECT * FROM exercises WHERE id = ?", bind: { bindText($0, 1, id) }) { stmt in
             Exercise(
                 id: colText(stmt, 0),
                 name: colText(stmt, 1),
                 muscleGroup: colText(stmt, 2),
                 defaultSide: Side(rawValue: colText(stmt, 3)) ?? .both,
                 isBuiltIn: colBool(stmt, 4),
-                createdAt: colDouble(stmt, 5)
+                createdAt: colInt(stmt, 5)
             )
         }.first
     }
 
     func findExercise(byName name: String) -> Exercise? {
-        db.query("SELECT * FROM exercises WHERE name = ? LIMIT 1", { bindText($0, 1, name) }) { stmt in
+        db.query("SELECT * FROM exercises WHERE name = ? LIMIT 1", bind: { bindText($0, 1, name) }) { stmt in
             Exercise(
                 id: colText(stmt, 0),
                 name: colText(stmt, 1),
                 muscleGroup: colText(stmt, 2),
                 defaultSide: Side(rawValue: colText(stmt, 3)) ?? .both,
                 isBuiltIn: colBool(stmt, 4),
-                createdAt: colDouble(stmt, 5)
+                createdAt: colInt(stmt, 5)
             )
         }.first
     }
@@ -134,7 +134,7 @@ final class Repository {
             muscleGroup: group,
             defaultSide: side,
             isBuiltIn: false,
-            createdAt: Date().timeIntervalSince1970 * 1000
+            createdAt: Int(Date().timeIntervalSince1970 * 1000)
         )
         insertExerciseRow(ex)
         notifyChanged()
@@ -153,7 +153,7 @@ final class Repository {
 
     func deleteExercise(_ ex: Exercise) {
         guard !ex.isBuiltIn else { return }
-        db.run("DELETE FROM exercises WHERE id=?", { bindText($0, 1, ex.id) })
+        db.run("DELETE FROM exercises WHERE id=?", bind: { bindText($0, 1, ex.id) })
         notifyChanged()
     }
 
@@ -181,15 +181,15 @@ final class Repository {
     }
 
     func getSessionByDate(_ date: String) -> WorkoutSession? {
-        db.query("SELECT * FROM sessions WHERE date = ? LIMIT 1", { bindText($0, 1, date) }, row: mapSession).first
+        db.query("SELECT * FROM sessions WHERE date = ? LIMIT 1", bind: { bindText($0, 1, date) }, row: mapSession).first
     }
 
     func getSessionExercises(_ sessionId: String) -> [SessionExercise] {
-        db.query("SELECT * FROM session_exercises WHERE sessionId = ? ORDER BY orderIndex ASC", { bindText($0, 1, sessionId) }, row: mapSessionExercise)
+        db.query("SELECT * FROM session_exercises WHERE sessionId = ? ORDER BY orderIndex ASC", bind: { bindText($0, 1, sessionId) }, row: mapSessionExercise)
     }
 
     func getSets(_ sessionExerciseId: String) -> [SetRecord] {
-        db.query("SELECT * FROM sets WHERE sessionExerciseId = ? ORDER BY setIndex ASC", { bindText($0, 1, sessionExerciseId) }, row: mapSet)
+        db.query("SELECT * FROM sets WHERE sessionExerciseId = ? ORDER BY setIndex ASC", bind: { bindText($0, 1, sessionExerciseId) }, row: mapSet)
     }
 
     /// 只查某个训练会话下的所有组（避免全表扫描）。
@@ -197,7 +197,7 @@ final class Repository {
         db.query(
             "SELECT sets.* FROM sets JOIN session_exercises se ON sets.sessionExerciseId = se.id " +
             "WHERE se.sessionId = ? ORDER BY sets.setIndex ASC",
-            { bindText($0, 1, sessionId) },
+            bind: { bindText($0, 1, sessionId) },
             row: mapSet
         )
     }
@@ -285,7 +285,7 @@ final class Repository {
     }
 
     func deleteSet(_ set: SetRecord) {
-        db.run("DELETE FROM sets WHERE id=?", { bindText($0, 1, set.id) })
+        db.run("DELETE FROM sets WHERE id=?", bind: { bindText($0, 1, set.id) })
         reindexSets(set.sessionExerciseId)
         notifyChanged()
     }
@@ -302,11 +302,11 @@ final class Repository {
 
     /// 删除当天某个动作及其全部组；若当天已无动作，连同 session 一起删除。
     func deleteExerciseFromDay(_ se: SessionExercise) {
-        db.run("DELETE FROM sets WHERE sessionExerciseId=?", { bindText($0, 1, se.id) })
-        db.run("DELETE FROM session_exercises WHERE id=?", { bindText($0, 1, se.id) })
+        db.run("DELETE FROM sets WHERE sessionExerciseId=?", bind: { bindText($0, 1, se.id) })
+        db.run("DELETE FROM session_exercises WHERE id=?", bind: { bindText($0, 1, se.id) })
         let remaining = getSessionExercises(se.sessionId)
         if remaining.isEmpty {
-            db.run("DELETE FROM sessions WHERE id=?", { bindText($0, 1, se.sessionId) })
+            db.run("DELETE FROM sessions WHERE id=?", bind: { bindText($0, 1, se.sessionId) })
         }
         notifyChanged()
     }
@@ -339,13 +339,13 @@ final class Repository {
             "SELECT s.createdAt FROM sessions s " +
             "JOIN session_exercises se ON se.sessionId = s.id " +
             "WHERE se.exerciseId = ? ORDER BY s.createdAt DESC LIMIT 1",
-            { bindText($0, 1, exerciseId) },
+            bind: { bindText($0, 1, exerciseId) },
             row: { colDouble($0, 0) }
         ).first
     }
 
     func getRule(_ exerciseId: String) -> ReminderRule? {
-        db.query("SELECT * FROM reminder_rules WHERE exerciseId = ?", { bindText($0, 1, exerciseId) }) { stmt in
+        db.query("SELECT * FROM reminder_rules WHERE exerciseId = ?", bind: { bindText($0, 1, exerciseId) }) { stmt in
             ReminderRule(exerciseId: colText(stmt, 0), enabled: colBool(stmt, 1), thresholdHours: colInt(stmt, 2))
         }.first
     }
@@ -372,7 +372,7 @@ final class Repository {
             "JOIN sessions s ON se.sessionId = s.id " +
             "WHERE se.exerciseId = ? " +
             "ORDER BY s.createdAt ASC, sets.setIndex ASC",
-            { bindText($0, 1, exerciseId) }
+            bind: { bindText($0, 1, exerciseId) }
         ) { stmt in
             SetWithDate(
                 set: SetRecord(
@@ -592,7 +592,7 @@ final class Repository {
     }
 
     func deleteDraft(_ draft: VoiceDraft) {
-        db.run("DELETE FROM voice_drafts WHERE id=?", { bindText($0, 1, draft.id) })
+        db.run("DELETE FROM voice_drafts WHERE id=?", bind: { bindText($0, 1, draft.id) })
         notifyChanged()
     }
 }
