@@ -1,0 +1,11 @@
+# Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+.DS_Store
+
+# CocoaPods / SPM（本项目无第三方依赖，防止误生成）
+Pods/
+.build/
+Package.resolved

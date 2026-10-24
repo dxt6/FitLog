@@ -1,0 +1,82 @@
+name: iOS Build (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'FitLog-iOS/**'
+      - '.github/workflows/ios-build.yml'
+
+jobs:
+  build:
+    name: Build FitLog.app -> unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain info
+        run: |
+          sw_vers
+          xcodebuild -version
+          echo "iPhoneOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+
+      - name: List schemes (sanity check)
+        working-directory: FitLog-iOS
+        run: xcodebuild -list -project FitLog.xcodeproj
+
+      - name: Build (Release / iphoneos / unsigned)
+        working-directory: FitLog-iOS
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project FitLog.xcodeproj \
+            -scheme FitLog \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            2>&1 | tee build.log
+
+      - name: Package unsigned IPA
+        working-directory: FitLog-iOS
+        run: |
+          APP_PATH="build/Build/Products/Release-iphoneos/FitLog.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "::error::FitLog.app was not produced"
+            exit 1
+          fi
+          rm -rf Payload FitLog-unsigned.ipa
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+          /usr/bin/zip -qry -X FitLog-unsigned.ipa Payload
+          echo "--- IPA ---"
+          ls -lh FitLog-unsigned.ipa
+          echo "--- Info.plist ---"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP_PATH/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$APP_PATH/Info.plist" || true
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$APP_PATH/Info.plist" || true
+          echo "--- Architecture ---"
+          lipo -info "$APP_PATH/FitLog" || true
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: FitLog-unsigned-ipa
+          path: FitLog-iOS/FitLog-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: FitLog-iOS/build.log
+          if-no-files-found: ignore
