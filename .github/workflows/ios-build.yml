@@ -45,6 +45,20 @@ jobs:
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
             2>&1 | tee build.log
 
+      - name: Surface compile errors as annotations
+        if: failure()
+        working-directory: FitLog-iOS
+        run: |
+          echo "===== error: lines ====="
+          grep -E "(error|fatal error|The following build commands failed)" build.log | head -60 || true
+          echo "===== emitting annotations ====="
+          grep -E "^[^ ]*:[0-9]+:[0-9]+: error:" build.log | head -20 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+          grep -E "error:" build.log | grep -v "^[^ ]*:[0-9]*:[0-9]*: error:" | head -10 | while IFS= read -r line; do
+            echo "::error::$line"
+          done
+
       - name: Package unsigned IPA
         working-directory: FitLog-iOS
         run: |
