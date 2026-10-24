@@ -59,7 +59,7 @@ final class ReminderManager: NSObject, UNUserNotificationCenterDelegate {
 
     private func checkAndNotify(_ completion: @escaping () -> Void) {
         DispatchQueue.global(qos: .utility).async {
-            let nowMs = Date().timeIntervalSince1970 * 1000
+            let nowMs = Int(Date().timeIntervalSince1970 * 1000)
             let targets = AppGraph.repository.getReminderTargets(nowMs: nowMs)
             guard !targets.isEmpty else {
                 DispatchQueue.main.async(execute: completion)

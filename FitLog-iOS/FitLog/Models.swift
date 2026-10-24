@@ -26,7 +26,7 @@ struct Exercise: Identifiable, Codable, Equatable {
     var muscleGroup: String
     var defaultSide: Side
     var isBuiltIn: Bool
-    var createdAt: Double
+    var createdAt: Int          // 毫秒时间戳（Int 保证 JSON 为整数，与安卓 Long 互通）
 }
 
 /// 某一天的一次训练（一天合并为一条）。
@@ -34,7 +34,7 @@ struct WorkoutSession: Identifiable, Codable, Equatable {
     var id: String
     var date: String            // yyyy-MM-dd
     var note: String
-    var createdAt: Double
+    var createdAt: Int
 }
 
 /// 本次训练里练的某个动作（用于排序）。
@@ -69,7 +69,7 @@ struct ReminderRule: Identifiable, Codable, Equatable {
 struct VoiceDraft: Identifiable, Codable, Equatable {
     var id: String
     var rawText: String
-    var createdAt: Double
+    var createdAt: Int
 }
 
 // MARK: - 查询结果
@@ -78,7 +78,7 @@ struct VoiceDraft: Identifiable, Codable, Equatable {
 struct SetWithDate {
     var set: SetRecord
     var sessionDate: String
-    var sessionCreatedAt: Double
+    var sessionCreatedAt: Int
 }
 
 /// UI 用：某天的某个动作及其所有组。

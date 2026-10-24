@@ -160,7 +160,7 @@ final class Repository {
     // MARK: - 训练记录
 
     private func mapSession(_ stmt: OpaquePointer) -> WorkoutSession {
-        WorkoutSession(id: colText(stmt, 0), date: colText(stmt, 1), note: colText(stmt, 2), createdAt: colDouble(stmt, 3))
+        WorkoutSession(id: colText(stmt, 0), date: colText(stmt, 1), note: colText(stmt, 2), createdAt: colInt(stmt, 3))
     }
 
     private func mapSessionExercise(_ stmt: OpaquePointer) -> SessionExercise {
@@ -314,7 +314,7 @@ final class Repository {
     // MARK: - 间隔提醒
 
     /// 有哪些动作超过设定间隔未练（nowMs 为当前毫秒时间戳）。
-    func getReminderTargets(nowMs: Double) -> [ReminderTarget] {
+    func getReminderTargets(nowMs: Int) -> [ReminderTarget] {
         guard isReminderEnabled() else { return [] }
         let exercises = getAllExercises()
         let defaultThreshold = getDefaultThreshold()
@@ -325,7 +325,7 @@ final class Repository {
             guard enabled else { continue }
             let threshold = (rule != nil && rule!.thresholdHours > 0) ? rule!.thresholdHours : defaultThreshold
             guard let last = getLastTrainedAt(ex.id) else { continue }
-            let elapsedHours = Int((nowMs - last) / 3_600_000)
+            let elapsedHours = (nowMs - last) / 3_600_000
             if elapsedHours >= threshold {
                 result.append(ReminderTarget(exercise: ex, thresholdHours: threshold, elapsedHours: elapsedHours))
             }
@@ -334,13 +334,13 @@ final class Repository {
     }
 
     /// 该动作最近一次训练的会话时间戳（毫秒）。
-    private func getLastTrainedAt(_ exerciseId: String) -> Double? {
+    private func getLastTrainedAt(_ exerciseId: String) -> Int? {
         db.query(
             "SELECT s.createdAt FROM sessions s " +
             "JOIN session_exercises se ON se.sessionId = s.id " +
             "WHERE se.exerciseId = ? ORDER BY s.createdAt DESC LIMIT 1",
             bind: { bindText($0, 1, exerciseId) },
-            row: { colDouble($0, 0) }
+            row: { colInt($0, 0) }
         ).first
     }
 
@@ -386,7 +386,7 @@ final class Repository {
                     note: colText(stmt, 7)
                 ),
                 sessionDate: colText(stmt, 8),
-                sessionCreatedAt: colDouble(stmt, 9)
+                sessionCreatedAt: colInt(stmt, 9)
             )
         }
     }
@@ -587,7 +587,7 @@ final class Repository {
 
     func getDrafts() -> [VoiceDraft] {
         db.query("SELECT * FROM voice_drafts ORDER BY createdAt DESC") { stmt in
-            VoiceDraft(id: colText(stmt, 0), rawText: colText(stmt, 1), createdAt: colDouble(stmt, 2))
+            VoiceDraft(id: colText(stmt, 0), rawText: colText(stmt, 1), createdAt: colInt(stmt, 2))
         }
     }
 

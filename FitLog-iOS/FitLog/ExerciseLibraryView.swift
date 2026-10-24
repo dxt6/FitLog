@@ -57,21 +57,20 @@ struct ExerciseLibraryView: View {
     @State private var toDelete: Exercise?
     @State private var reminderFor: Exercise?
 
-    private var grouped: [(String, [Exercise])] {
-        Dictionary(grouping: vm.exercises, by: \.muscleGroup)
-            .sorted { $0.key < $1.key }
+    private var grouped: [ExerciseGroup] {
+        groupExercises(vm.exercises)
     }
 
     var body: some View {
         NavigationStack {
             List {
-                ForEach(grouped, id: \.0) { group, list in
-                    Section(group) {
-                        ForEach(list) { ex in
+                ForEach(grouped) { group in
+                    Section(group.name) {
+                        ForEach(group.items) { ex in
                             row(ex)
                         }
                         .onDelete { offsets in
-                            let items = offsets.map { list[$0] }
+                            let items = offsets.map { group.items[$0] }
                             for it in items where !it.isBuiltIn { toDelete = it }
                         }
                     }

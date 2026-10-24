@@ -121,6 +121,16 @@ struct TrainView: View {
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
+            .sheet(item: $editingSet) { set in
+                SetEditSheet(set: set, unit: unit) { updated in
+                    vm.updateSet(updated)
+                    editingSet = nil
+                } onDelete: {
+                    let target = set
+                    editingSet = nil
+                    confirmDeleteSet = target
+                }
+            }
         }
         .onChange(of: voiceVm.state) { newState in
             handleVoiceState(newState)
@@ -129,16 +139,6 @@ struct TrainView: View {
             AddExerciseSheet(exercises: vm.exercises) { ex in
                 vm.addExercise(ex.id)
                 showAddExercise = false
-            }
-        }
-        .sheet(item: $editingSet) { set in
-            SetEditSheet(set: set, unit: unit) { updated in
-                vm.updateSet(updated)
-                editingSet = nil
-            } onDelete: {
-                let target = set
-                editingSet = nil
-                confirmDeleteSet = target
             }
         }
         .alert(
@@ -360,7 +360,8 @@ private struct MonthCalendarCard: View {
     private var dayGrid: some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
         return LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(Array(cells.enumerated()), id: \.offset) { _, cell in
+            ForEach(0..<cells.count, id: \.self) { index in
+                let cell = cells[index]
                 if let d = cell {
                     DayCell(
                         dateStr: d,
@@ -444,11 +445,15 @@ private struct VoiceCaptureBar: View {
         .scaleEffect(vm.isRecording ? 1.08 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: vm.isRecording)
         .contentShape(Circle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in vm.pressStarted() }
-                .onEnded { _ in vm.pressEnded() }
-        )
+        .onLongPressGesture(minimumDuration: .infinity) {
+            // 永不触发的长按完成回调；按下/松开由 onPressingChanged 处理
+        } onPressingChanged: { pressing in
+            if pressing {
+                vm.pressStarted()
+            } else {
+                vm.pressEnded()
+            }
+        }
         .accessibilityLabel("按住说话")
     }
 }
@@ -527,17 +532,12 @@ private struct AddExerciseSheet: View {
         return exercises.filter { $0.name.localizedCaseInsensitiveContains(q) || $0.muscleGroup.contains(q) }
     }
 
-    private var grouped: [(String, [Exercise])] {
-        Dictionary(grouping: filtered, by: \.muscleGroup)
-            .sorted { $0.key < $1.key }
-    }
-
     var body: some View {
         NavigationStack {
             List {
-                ForEach(grouped, id: \.0) { group, list in
-                    Section(group) {
-                        ForEach(list) { ex in
+                ForEach(groupExercises(filtered)) { group in
+                    Section(group.name) {
+                        ForEach(group.items) { ex in
                             Button(ex.name) {
                                 onPick(ex)
                             }

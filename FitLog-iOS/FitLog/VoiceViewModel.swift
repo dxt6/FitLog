@@ -29,6 +29,7 @@ final class VoiceViewModel: ObservableObject {
     private let recorder = VoiceRecorder()
     private let client = SiliconFlowClient()
     private var tickTimer: Timer?
+    private var awaitingPermission = false
 
     var isRecording: Bool {
         if case .recording = state { return true }
@@ -50,10 +51,12 @@ final class VoiceViewModel: ObservableObject {
 
     /// 按下麦克风：请求权限并开始录音。
     func pressStarted() {
-        if isRecording { return }
+        if isRecording || awaitingPermission { return }
+        awaitingPermission = true
         AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
             DispatchQueue.main.async {
                 guard let self else { return }
+                self.awaitingPermission = false
                 if granted {
                     self.startRecording()
                 } else {

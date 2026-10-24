@@ -5,6 +5,15 @@ DerivedData/
 *.xcuserdatad/
 .DS_Store
 
+# 构建产物（CI / 本地 xcodebuild）
+build/
+build.log
+build.log.zip
+Payload/
+*.ipa
+*.zip
+FitLog-ios-simulator.zip
+
 # CocoaPods / SPM（本项目无第三方依赖，防止误生成）
 Pods/
 .build/

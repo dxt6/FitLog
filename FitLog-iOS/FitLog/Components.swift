@@ -23,6 +23,19 @@ func weightDisplay(_ kg: Double, unit: String) -> String {
 
 // MARK: - 通用小组件
 
+/// 动作按肌群分组结果（供 List/ForEach 使用，避免元组 KeyPath 限制）。
+struct ExerciseGroup: Identifiable {
+    let name: String
+    let items: [Exercise]
+    var id: String { name }
+}
+
+func groupExercises(_ list: [Exercise]) -> [ExerciseGroup] {
+    Dictionary(grouping: list, by: \.muscleGroup)
+        .map { ExerciseGroup(name: $0.key, items: $0.value) }
+        .sorted { $0.name < $1.name }
+}
+
 /// 肌群标签小胶囊。
 struct GroupChip: View {
     let text: String

@@ -191,8 +191,8 @@ struct SettingsView: View {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
 
-    private func draftTime(_ ms: Double) -> String {
-        let date = Date(timeIntervalSince1970: ms / 1000)
+    private func draftTime(_ ms: Int) -> String {
+        let date = Date(timeIntervalSince1970: Double(ms) / 1000)
         let fmt = DateFormatter()
         fmt.dateFormat = "MM-dd HH:mm"
         return fmt.string(from: date)
